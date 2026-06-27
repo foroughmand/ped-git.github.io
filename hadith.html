@@ -707,6 +707,36 @@
             display: none;
         }
         #hadith-error-log:not(:empty) { display: block; }
+        .dbv01-note {
+            margin: 0 0 12px;
+            color: #475569;
+            font-size: 0.9rem;
+        }
+        .dbv01-card {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .dbv01-book-name {
+            font-weight: 700;
+            color: #1e3a8a;
+            font-size: 1.02rem;
+        }
+        .dbv01-meta {
+            color: #475569;
+            font-size: 0.9rem;
+        }
+        .dbv01-source-link {
+            align-self: flex-start;
+            color: #1d4ed8;
+            text-decoration: none;
+            font-size: 0.9rem;
+            border: 1px solid #93c5fd;
+            background: #eff6ff;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+        .dbv01-source-link:hover { background: #dbeafe; }
     </style>
 </head>
 <body>
@@ -732,6 +762,9 @@
             const HADITH_SOURCE_STORAGE_KEY = 'hadith-source';
             const HADITH_SOURCE_HADITH_AI = 'hadith-ai';
             const HADITH_SOURCE_CONSENSUS = 'consensus';
+            const HADITH_SOURCE_DBV01 = 'hadith-db-v01';
+            const DBV01_BASE_URL = 'https://raw.githubusercontent.com/csquranics/hadith-db-v01/main';
+            const DBV01_PAGE_SIZE = 10;
             const HADITH_EXPORT_OPTION_CONSENSUS_TRANSLATE_TABLE = 'consensus-translate-table';
 
             var state = {
@@ -758,6 +791,17 @@
                 consensusHadithView: {},
                 consensusLoading: false,
                 consensusError: '',
+                dbv01Loading: false,
+                dbv01Error: '',
+                dbv01Refs: [],
+                dbv01VerseText: '',
+                dbv01TotalQuotes: 0,
+                dbv01VisibleCount: DBV01_PAGE_SIZE,
+                dbv01Manifest: null,
+                dbv01ManifestPromise: null,
+                dbv01DocShards: {},
+                dbv01DocShardPromises: {},
+                dbv01Resolved: {},
                 eventsBound: false
             };
 
@@ -772,14 +816,16 @@
             }
 
             function normalizeHadithSource(value) {
-                return value === HADITH_SOURCE_CONSENSUS ? HADITH_SOURCE_CONSENSUS : HADITH_SOURCE_HADITH_AI;
+                if (value === HADITH_SOURCE_CONSENSUS) return HADITH_SOURCE_CONSENSUS;
+                if (value === HADITH_SOURCE_HADITH_AI) return HADITH_SOURCE_HADITH_AI;
+                return HADITH_SOURCE_DBV01;
             }
 
             function getStoredHadithSource() {
                 try {
                     return normalizeHadithSource(window.localStorage.getItem(HADITH_SOURCE_STORAGE_KEY));
                 } catch (err) {
-                    return HADITH_SOURCE_HADITH_AI;
+                    return HADITH_SOURCE_DBV01;
                 }
             }
 
@@ -1388,6 +1434,7 @@
                 var source = state.source;
                 var hadithAiChecked = source === HADITH_SOURCE_HADITH_AI ? ' checked' : '';
                 var consensusChecked = source === HADITH_SOURCE_CONSENSUS ? ' checked' : '';
+                var dbv01Checked = source === HADITH_SOURCE_DBV01 ? ' checked' : '';
                 var exportDisabled = state.exportInProgress ? ' disabled' : '';
                 var exportStatusClass = state.exportStatusType === 'error' ? ' hadith-export-status is-error' : ' hadith-export-status';
                 var html = '';
@@ -1403,6 +1450,7 @@
                 html += '</div>';
                 html += '<div class="hadith-settings-section">';
                 html += '<div class="hadith-links-title">منبع حدیث</div>';
+                html += '<label class="hadith-source-option"><input type="radio" name="hadith-source" value="' + HADITH_SOURCE_DBV01 + '"' + dbv01Checked + '>پایگاه جدید (v01)</label>';
                 html += '<label class="hadith-source-option"><input type="radio" name="hadith-source" value="' + HADITH_SOURCE_HADITH_AI + '"' + hadithAiChecked + '>اولیه</label>';
                 html += '<label class="hadith-source-option"><input type="radio" name="hadith-source" value="' + HADITH_SOURCE_CONSENSUS + '"' + consensusChecked + '>بازسازی شده</label>';
                 html += '</div>';
@@ -1738,12 +1786,181 @@
                 return html;
             }
 
+            function dbv01Pad(num, count) {
+                var width = Math.max(2, String(Math.max(0, count - 1)).length);
+                var s = String(num);
+                while (s.length < width) s = '0' + s;
+                return s;
+            }
+
+            function dbv01Pad3(num) {
+                var s = String(num);
+                while (s.length < 3) s = '0' + s;
+                return s;
+            }
+
+            function ensureDbv01Manifest() {
+                if (state.dbv01Manifest) return Promise.resolve(state.dbv01Manifest);
+                if (!state.dbv01ManifestPromise) {
+                    state.dbv01ManifestPromise = fetchJson(DBV01_BASE_URL + '/hadith/manifest.json', 'خطا در دریافت فهرست پایگاه احادیث').then(function(man) {
+                        state.dbv01Manifest = man;
+                        return man;
+                    }).finally(function() { state.dbv01ManifestPromise = null; });
+                }
+                return state.dbv01ManifestPromise;
+            }
+
+            function ensureDbv01DocShard(shard) {
+                if (state.dbv01DocShards[shard]) return Promise.resolve(state.dbv01DocShards[shard]);
+                if (!state.dbv01DocShardPromises[shard]) {
+                    var man = state.dbv01Manifest;
+                    var fn = 'hadith/doc/d' + dbv01Pad(shard, man.doc_shards) + '.json';
+                    state.dbv01DocShardPromises[shard] = fetchJson(DBV01_BASE_URL + '/' + fn, 'خطا در دریافت اطلاعات حدیث').then(function(arr) {
+                        state.dbv01DocShards[shard] = arr;
+                        return arr;
+                    }).finally(function() { delete state.dbv01DocShardPromises[shard]; });
+                }
+                return state.dbv01DocShardPromises[shard];
+            }
+
+            function dbv01BuildSourceUrl(book, page) {
+                if (!book) return '';
+                var pat = book.url_pattern || book.url || '';
+                if (!pat) return '';
+                if (pat.indexOf('{page}') !== -1) {
+                    return pat.replace('{page}', encodeURIComponent(page != null ? String(page) : ''));
+                }
+                return pat;
+            }
+
+            async function resolveDbv01Docid(docid) {
+                var key = String(docid);
+                if (state.dbv01Resolved[key]) return state.dbv01Resolved[key];
+                var man = state.dbv01Manifest;
+                var shard = Math.floor(docid / man.doc_shard_size);
+                var arr = await ensureDbv01DocShard(shard);
+                var row = arr ? arr[docid % man.doc_shard_size] : null;
+                var resolved;
+                if (!row) {
+                    resolved = { missing: true };
+                } else {
+                    var book = (man.books && man.books[row[0]]) || null;
+                    resolved = {
+                        book: book,
+                        bookName: book ? (book.name || book.title || book.slug) : '',
+                        site: book ? (book.site || '') : '',
+                        hadithId: row[1],
+                        page: row[2],
+                        vol: row[3],
+                        url: dbv01BuildSourceUrl(book, row[2])
+                    };
+                }
+                state.dbv01Resolved[key] = resolved;
+                return resolved;
+            }
+
+            async function loadDbv01RefsInRange(startIdx, endIdx) {
+                for (var i = startIdx; i < endIdx && i < state.dbv01Refs.length; i++) {
+                    var docid = state.dbv01Refs[i];
+                    if (state.dbv01Resolved[String(docid)]) continue;
+                    try {
+                        await resolveDbv01Docid(docid);
+                    } catch (err) {
+                        console.error('[hadith-db-v01] resolve failed for', docid, err);
+                        state.dbv01Resolved[String(docid)] = { error: err.message || 'خطا در بارگذاری' };
+                    }
+                    if (state.source === HADITH_SOURCE_DBV01) renderPage();
+                    await new Promise(function(r) { setTimeout(r, 0); });
+                }
+            }
+
+            async function prepareDbv01ForCurrentAyah() {
+                var params = getParams();
+                state.dbv01Loading = true;
+                state.dbv01Error = '';
+                state.dbv01Refs = [];
+                state.dbv01VerseText = '';
+                state.dbv01TotalQuotes = 0;
+                state.dbv01VisibleCount = DBV01_PAGE_SIZE;
+                renderPage();
+                try {
+                    await ensureDbv01Manifest();
+                    var refFile = DBV01_BASE_URL + '/ayah/ref/s' + dbv01Pad3(params.s) + '.json';
+                    var data = await fetchJson(refFile, 'خطا در دریافت ارجاعات آیه');
+                    var entry = data && data[String(params.a)];
+                    if (entry && Array.isArray(entry.refs)) {
+                        state.dbv01Refs = entry.refs.slice();
+                        state.dbv01VerseText = entry.t || '';
+                        state.dbv01TotalQuotes = entry.n || entry.refs.length;
+                    }
+                } catch (err) {
+                    console.error('[hadith-db-v01] prepare failed', err);
+                    state.dbv01Error = err.message || 'خطا در بارگذاری ارجاعات این آیه';
+                }
+                state.dbv01Loading = false;
+                state.dbv01VisibleCount = DBV01_PAGE_SIZE;
+                renderPage();
+                await loadDbv01RefsInRange(0, Math.min(state.dbv01VisibleCount, state.dbv01Refs.length));
+            }
+
+            function renderDbv01CardHtml(docid) {
+                var r = state.dbv01Resolved[String(docid)];
+                if (!r) {
+                    return '<article class="hadith-card hadith-card--loading">' +
+                        '<div class="hadith-card-placeholder"><span class="hadith-card-spinner"></span> در حال بارگذاری ارجاع...</div></article>';
+                }
+                if (r.error || r.missing) {
+                    return '<article class="hadith-card hadith-card--error">' +
+                        '<div class="hadith-card-error">' + escapeHtml(r.error || 'این ارجاع در پایگاه یافت نشد') + '</div></article>';
+                }
+                var meta = [];
+                if (r.vol != null && r.vol !== '') meta.push('جلد ' + fmtFa(r.vol));
+                if (r.page != null && r.page !== '') meta.push('صفحه ' + fmtFa(r.page));
+                var html = '<article class="hadith-card dbv01-card">';
+                html += '<div class="dbv01-book-name">' + escapeHtml(r.bookName || 'منبع نامشخص') + '</div>';
+                if (meta.length) html += '<div class="dbv01-meta">' + meta.join(' | ') + '</div>';
+                if (r.url) {
+                    html += '<a class="dbv01-source-link" href="' + escapeHtml(r.url) + '" target="_blank" rel="noopener noreferrer">مشاهده در منبع' + (r.site ? ' (' + escapeHtml(r.site) + ')' : '') + ' ↗</a>';
+                }
+                html += '</article>';
+                return html;
+            }
+
+            function renderDbv01SectionHtml() {
+                if (state.dbv01Loading && state.dbv01Refs.length === 0) {
+                    return '<div class="loading">در حال بارگذاری ارجاعات این آیه...</div>';
+                }
+                if (state.dbv01Error) {
+                    return '<div class="error">' + escapeHtml(state.dbv01Error) + '</div>';
+                }
+                if (!state.dbv01Refs.length) {
+                    return '<p class="loading">حدیثی شامل این آیه در این پایگاه یافت نشد.</p>';
+                }
+                var visibleCount = Math.min(state.dbv01VisibleCount, state.dbv01Refs.length);
+                var html = '<h2 class="hadith-section-title">احادیث دربردارندهٔ این آیه (' + fmtFa(state.dbv01Refs.length) + ')</h2>';
+                if (state.dbv01TotalQuotes && state.dbv01TotalQuotes !== state.dbv01Refs.length) {
+                    html += '<div class="dbv01-note">این آیه ' + fmtFa(state.dbv01TotalQuotes) + ' بار در احادیث نقل شده است.</div>';
+                }
+                html += '<div id="dbv01-list">';
+                for (var i = 0; i < visibleCount; i++) {
+                    html += renderDbv01CardHtml(state.dbv01Refs[i]);
+                }
+                html += '<div id="dbv01-load-more-wrap">';
+                if (visibleCount < state.dbv01Refs.length) {
+                    html += '<button type="button" class="hadith-load-more-btn dbv01-load-more-btn">بارگذاری ۱۰ مورد بعد</button>';
+                }
+                html += '</div></div>';
+                return html;
+            }
+
             function renderPage() {
                 var params = getParams();
                 var title = document.getElementById('page-title');
                 title.textContent = 'احادیث مرتبط با آیه — ' + getSuraName(params.s) + '، آیه ' + params.a;
                 var html = buildAyahSectionHtml(state.verse);
-                html += state.source === HADITH_SOURCE_CONSENSUS ? renderConsensusSectionHtml() : renderHadithAiSectionHtml();
+                if (state.source === HADITH_SOURCE_CONSENSUS) html += renderConsensusSectionHtml();
+                else if (state.source === HADITH_SOURCE_DBV01) html += renderDbv01SectionHtml();
+                else html += renderHadithAiSectionHtml();
                 show(document.getElementById('content'), html);
             }
 
@@ -1832,6 +2049,13 @@
                     return;
                 }
                 var loadMoreBtn = target.closest && target.closest('.hadith-load-more-btn');
+                if (loadMoreBtn && !loadMoreBtn.disabled && loadMoreBtn.classList.contains('dbv01-load-more-btn')) {
+                    var currentVisibleDbv01 = Math.min(state.dbv01VisibleCount, state.dbv01Refs.length);
+                    state.dbv01VisibleCount = Math.min(state.dbv01VisibleCount + DBV01_PAGE_SIZE, state.dbv01Refs.length);
+                    renderPage();
+                    loadDbv01RefsInRange(currentVisibleDbv01, state.dbv01VisibleCount);
+                    return;
+                }
                 if (loadMoreBtn && !loadMoreBtn.disabled && loadMoreBtn.classList.contains('consensus-load-more-btn')) {
                     var currentVisibleConsensus = Math.min(state.consensusVisibleCount, state.consensusMatchedSetIds.length);
                     state.consensusVisibleCount = Math.min(state.consensusVisibleCount + CONSENSUS_PAGE_SIZE, state.consensusMatchedSetIds.length);
@@ -2140,6 +2364,15 @@
                         console.error('[consensus] activation failed', err);
                         state.consensusLoading = false;
                         state.consensusError = err.message || 'خطا در بارگذاری داده‌های اجماعی';
+                        renderPage();
+                    }
+                } else if (state.source === HADITH_SOURCE_DBV01) {
+                    try {
+                        await prepareDbv01ForCurrentAyah();
+                    } catch (err) {
+                        console.error('[hadith-db-v01] activation failed', err);
+                        state.dbv01Loading = false;
+                        state.dbv01Error = err.message || 'خطا در بارگذاری داده‌های پایگاه احادیث';
                         renderPage();
                     }
                 } else {
