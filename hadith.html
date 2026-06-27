@@ -1796,10 +1796,10 @@
                     return '<div class="error">' + escapeHtml(state.consensusError) + '</div>';
                 }
                 if (!state.consensusMatchedSetIds.length) {
-                    return '<p class="loading">مجموعه اجماعیِ دارای ترجمه برای این آیه پیدا نشد.</p>';
+                    return '<p class="loading">مجموعه اجماعی برای این آیه پیدا نشد.</p>';
                 }
                 var visibleCount = Math.min(state.consensusVisibleCount, state.consensusMatchedSetIds.length);
-                var html = '<h2 class="hadith-section-title">مجموعه‌های اجماعی دارای ترجمه (' + fmtFa(state.consensusMatchedSetIds.length) + ')</h2>';
+                var html = '<h2 class="hadith-section-title">مجموعه‌های اجماعی (' + fmtFa(state.consensusMatchedSetIds.length) + ')</h2>';
                 html += '<div id="consensus-list">';
                 for (var i = 0; i < visibleCount; i++) {
                     html += renderConsensusCard(state.consensusMatchedSetIds[i], i);
@@ -2028,8 +2028,10 @@
                 for (var j = 0; j < state.consensusTranslateOrder.length; j++) {
                     var setId = state.consensusTranslateOrder[j];
                     var summary = state.consensusTranslateById[setId];
-                    if (!summary || Number(summary.translation_available_count || 0) <= 0) continue;
-                    if (summary.translation_source_hid && hadithIdSet.has(String(summary.translation_source_hid))) {
+                    // Show every matched consensus set as a reference — including
+                    // sets that have no translation. Do not filter on translation.
+                    if (!summary) continue;
+                    if (summary.translation_source_hid != null && hadithIdSet.has(String(summary.translation_source_hid))) {
                         matchedSetIds.add(setId);
                     }
                 }
@@ -2163,7 +2165,7 @@
                     }
                     var setIds = await ensureConsensusDataForExport();
                     if (!setIds.length) {
-                        throw new Error('برای این آیه مجموعه اجماعیِ دارای ترجمه پیدا نشد');
+                        throw new Error('برای این آیه مجموعه اجماعی پیدا نشد');
                     }
                     var params = getParams();
                     var filename = 'hadith-consensus-translate-s' + fmtEn(params.s) + '-a' + fmtEn(params.a) + '.doc';
