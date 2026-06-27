@@ -624,14 +624,60 @@
     function chaptersUrl() {
         return 'https://api.quran.com/api/v4/chapters?language=fa';
     }
+    /* Per-ayah verse URL exactly as hadith.html builds it — order of query
+       params must match for the cache key to hit. */
+    function hadithVerseUrl(sura, ayah) {
+        return 'https://api.quran.com/api/v4/verses/by_key/' + sura + ':' + ayah +
+               '?translations=135&fields=text_uthmani&words=true&word_fields=v1_page,code_v1,text_uthmani';
+    }
 
-    /* Fetched once per batch so the page can render any sura offline:
-       - bismillah is shown before every sura except 1 and 9
-       - chapters list is used for verse-key → page mapping and metadata. */
-    async function prefetchSharedText() {
-        var b = await safeFetch(bismillahUrl());
+    var chaptersById = null;
+
+    /* The chapters list maps sura → page range; we need it whenever we want
+       to prefetch the right QCF page fonts, regardless of which content
+       types were selected. */
+    async function prefetchChapters() {
+        if (chaptersById) return;
         var c = await safeFetch(chaptersUrl());
-        return !!(b && b.ok) && !!(c && c.ok);
+        if (c && c.ok) {
+            try {
+                var data = await c.clone().json();
+                chaptersById = {};
+                (data.chapters || []).forEach(function(ch) { chaptersById[ch.id] = ch; });
+            } catch (e) { /* ignore */ }
+        }
+    }
+
+    /* Fetched once per batch when «متن» is selected anywhere:
+       - bismillah is shown before every sura except 1 and 9
+       - morphology corpus is loaded by corpus.js on every sura render
+       - QCF page 1 font is needed for the leading Bismillah glyphs */
+    async function prefetchSharedText() {
+        await prefetchChapters();
+        await safeFetch(bismillahUrl());
+        await safeFetch('data/quranic-corpus-morphology-0.4.txt');
+        // CSS @font-face triggers a CORS-mode font request; prefetch matching
+        // mode so the cached response carries the right CORS headers.
+        await safeFetch('https://verses.quran.foundation/fonts/quran/hafs/v1/woff2/p1.woff2');
+        return true;
+    }
+
+    async function prefetchQcfFontsForSura(sura) {
+        var ch = chaptersById && chaptersById[sura];
+        if (!ch || !Array.isArray(ch.pages) || ch.pages.length < 2) return;
+        var start = parseInt(ch.pages[0], 10);
+        var end = parseInt(ch.pages[1], 10);
+        if (!isFinite(start) || !isFinite(end) || start < 1) return;
+        // simple.html sometimes needs the page after `end` too (when a sura's
+        // last verse continues onto the next page). Fetch one extra page when
+        // it exists.
+        var endPlus = Math.min(end + 1, 604);
+        for (var p = start; p <= endPlus; p++) {
+            if (cancelRequested) return;
+            // CORS mode matches what the page's @font-face requests, so the
+            // cached response can satisfy them without an opaque mismatch.
+            await safeFetch('https://verses.quran.foundation/fonts/quran/hafs/v1/woff2/p' + p + '.woff2');
+        }
     }
 
     async function safeFetch(url, init) {
@@ -648,6 +694,7 @@
         var url = textUrlForSura(sura);
         var resp = await safeFetch(url);
         if (!resp || !resp.ok) { progress.failed++; return false; }
+        await prefetchQcfFontsForSura(sura);
         return true;
     }
 
@@ -736,8 +783,12 @@
         var n = SURA_AYAT[sura] || 0;
         var ok = true;
         var seenHid = {};
+        await prefetchQcfFontsForSura(sura);
         for (var a = 1; a <= n; a++) {
             if (cancelRequested) return false;
+            // hadith.html opens by_key for each ayah before showing the hadith list.
+            var vresp = await safeFetch(hadithVerseUrl(sura, a));
+            if (!vresp || !vresp.ok) ok = false;
             var ids = await downloadHadithAyah(sura, a);
             tick('احادیث سوره ' + sura + ' آیه ' + a);
             for (var i = 0; i < ids.length; i++) {
@@ -824,8 +875,10 @@
         setProgressBar(0);
         setProgressText('شروع دانلود... (۰/' + progress.total + ')');
 
+        setProgressText('در حال دریافت فهرست سوره‌ها...');
+        await prefetchChapters();
         if (selections.some(function(s) { return s.text; })) {
-            setProgressText('در حال دریافت بسم‌الله و فهرست سوره‌ها...');
+            setProgressText('در حال دریافت بسم‌الله و داده‌های صرفی...');
             await prefetchSharedText();
         }
 

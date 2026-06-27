@@ -42,7 +42,11 @@ const APP_SHELL_URLS = [
   './js/search.js',
   './fonts/Sahel.woff',
   './fonts/sura_names.woff2',
-  './fonts/sura_names.woff'
+  './fonts/sura_names.woff',
+  './fonts/B%20LOTUS%20S1%20REGULAR%20R1.TTF',
+  './fonts/KFGQPC%20Uthman%20Taha%20Naskh%20Regular.ttf',
+  './fonts/me_quran.woff',
+  './fonts/me_quran.ttf'
 ];
 
 const HADITH_POST_HOSTS = ['hadith.ai'];
@@ -199,7 +203,13 @@ self.addEventListener('fetch', (event) => {
         return resp;
       } catch (err) {
         const cache = await caches.open(APP_SHELL_CACHE);
-        const cached = await cache.match(req) || await cache.match('./simple.html');
+        // Try the exact URL first (query string included), then ignore the
+        // search so e.g. hadith.html?s=2&a=10 falls back to the cached
+        // hadith.html. Last resort: simple.html as a generic shell.
+        const cached =
+          (await cache.match(req)) ||
+          (await cache.match(req, { ignoreSearch: true })) ||
+          (await cache.match('./simple.html'));
         if (cached) return cached;
         return offlineResponse(err && err.message);
       }
