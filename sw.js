@@ -197,7 +197,9 @@ self.addEventListener('fetch', (event) => {
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
       try {
-        const resp = await fetch(req);
+        // Bypass the HTTP cache for navigations so a freshly deployed HTML is
+        // picked up immediately instead of a stale max-age copy.
+        const resp = await fetch(req, { cache: 'reload' });
         const cache = await caches.open(APP_SHELL_CACHE);
         cache.put(req, resp.clone()).catch(() => {});
         return resp;
