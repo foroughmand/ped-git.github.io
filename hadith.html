@@ -496,6 +496,31 @@
             margin-bottom: 8px;
             line-height: 1.7;
         }
+        .consensus-card-badges {
+            margin-bottom: 8px;
+        }
+        .consensus-type-badge {
+            display: inline-block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 2px 10px;
+            border-radius: 999px;
+            border: 1px solid transparent;
+        }
+        .consensus-type-badge--single {
+            background: #fef3c7;
+            color: #92400e;
+            border-color: #fcd34d;
+        }
+        .consensus-type-badge--cluster {
+            background: #dbeafe;
+            color: #1e40af;
+            border-color: #93c5fd;
+        }
+        .consensus-card--single {
+            border-color: #fcd34d;
+            background: #fffdf7;
+        }
         .consensus-card-headerline {
             font-size: 0.9rem;
             color: #475569;
@@ -1747,7 +1772,11 @@
                 var isOpen = !!state.consensusOpen[setId];
                 var view = state.consensusHadithView[setId] || 'segment-grid';
                 var metaParts = [];
-                if (summary && summary.member_count != null) metaParts.push(fmtFa(summary.member_count) + ' حدیث');
+                var memberCount = (summary && summary.member_count != null) ? Number(summary.member_count) : null;
+                var isSingleton = memberCount === 1;
+                var typeBadge = isSingleton
+                    ? '<span class="consensus-type-badge consensus-type-badge--single">تک‌حدیث</span>'
+                    : '<span class="consensus-type-badge consensus-type-badge--cluster">اجماع' + (memberCount != null ? ' · ' + fmtFa(memberCount) + ' حدیث' : '') + '</span>';
                 if (summary && summary.segment_count != null) metaParts.push(fmtFa(summary.segment_count) + ' بخش');
                 if (summary && Number(summary.translation_available_count) > 0) metaParts.push(fmtFa(summary.translation_available_count) + ' ترجمه');
                 if (summary && summary.translation_source_hid != null) metaParts.push('شماره حدیث: ' + escapeHtml(fmtFa(summary.translation_source_hid)));
@@ -1757,9 +1786,9 @@
                     if (detail.translation_source.match_ratio != null) metaParts.push('تطبیق: ' + escapeHtml(fmtFa(Number(detail.translation_source.match_ratio).toFixed(2))));
                     if (detail.translation_source.translation_word_count != null) metaParts.push(fmtFa(detail.translation_source.translation_word_count) + ' واژه ترجمه');
                 }
-                var html = '<article class="consensus-card" data-set-id="' + escapeHtml(setId) + '">';
-                // html += '<h3 class="consensus-card-title">مجموعه روایی ' + fmtFa(orderIndex + 1) + '</h3>';
-                html += '<div class="consensus-card-meta">' + metaParts.join(' | ') + '</div>';
+                var html = '<article class="consensus-card' + (isSingleton ? ' consensus-card--single' : '') + '" data-set-id="' + escapeHtml(setId) + '">';
+                html += '<div class="consensus-card-badges">' + typeBadge + '</div>';
+                if (metaParts.length) html += '<div class="consensus-card-meta">' + metaParts.join(' | ') + '</div>';
                 if (summary && summary.body_consensus_preview) {
                     html += '<div class="consensus-card-headerline">' + escapeHtml(summary.body_consensus_preview) + '</div>';
                 }
@@ -1796,10 +1825,10 @@
                     return '<div class="error">' + escapeHtml(state.consensusError) + '</div>';
                 }
                 if (!state.consensusMatchedSetIds.length) {
-                    return '<p class="loading">مجموعه اجماعی برای این آیه پیدا نشد.</p>';
+                    return '<p class="loading">حدیثی برای این آیه پیدا نشد.</p>';
                 }
                 var visibleCount = Math.min(state.consensusVisibleCount, state.consensusMatchedSetIds.length);
-                var html = '<h2 class="hadith-section-title">مجموعه‌های اجماعی (' + fmtFa(state.consensusMatchedSetIds.length) + ')</h2>';
+                var html = '<h2 class="hadith-section-title">احادیث مرتبط با این آیه (' + fmtFa(state.consensusMatchedSetIds.length) + ')</h2>';
                 html += '<div id="consensus-list">';
                 for (var i = 0; i < visibleCount; i++) {
                     html += renderConsensusCard(state.consensusMatchedSetIds[i], i);
