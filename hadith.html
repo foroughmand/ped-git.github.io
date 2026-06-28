@@ -1669,18 +1669,15 @@
             }
 
             function buildConsensusMembersTable(setId) {
-                var translateDetail = state.consensusTranslateDetails[setId];
                 var detail = state.consensusMemberDetails[setId];
-                if (!detail || !translateDetail) {
+                if (!detail) {
                     return '<div class="consensus-card-loading">در حال بارگذاری احادیث این مجموعه...</div>';
                 }
                 if (!Array.isArray(detail.members) || detail.members.length === 0) {
                     return '<div class="consensus-card-empty">حدیثی برای این مجموعه پیدا نشد.</div>';
                 }
-                var view = state.consensusHadithView[setId] || 'segment-grid';
-                if (view === 'segment-grid') return buildConsensusSegmentAlignmentTable(detail, translateDetail);
-                if (view === 'token-grid') return buildConsensusTokenAlignmentTable(detail);
-                if (view === 'aligned-list') return buildConsensusAlignedHadithList(detail);
+                // The column/token-alignment views need data the current database
+                // does not provide; show each member hadith (isnad + matn + translation).
                 return buildConsensusSimpleHadithList(detail);
             }
 
@@ -1810,12 +1807,7 @@
                     html += '<div class="consensus-members-panel">';
                     html += '<div class="consensus-members-header">';
                     html += '<div class="consensus-members-title">احادیث این مجموعه</div>';
-                    html += '<div class="consensus-view-switch">';
-                    html += '<button type="button" class="consensus-view-btn' + (view === 'segment-grid' ? ' is-active' : '') + '" data-set-id="' + escapeHtml(setId) + '" data-view="segment-grid">هم‌ردیفی قطعه‌ها</button>';
-                    html += '<button type="button" class="consensus-view-btn' + (view === 'token-grid' ? ' is-active' : '') + '" data-set-id="' + escapeHtml(setId) + '" data-view="token-grid">هم‌ردیفی واژه‌ها</button>';
-                    html += '<button type="button" class="consensus-view-btn' + (view === 'aligned-list' ? ' is-active' : '') + '" data-set-id="' + escapeHtml(setId) + '" data-view="aligned-list">هم‌ردیفی احادیث</button>';
-                    html += '<button type="button" class="consensus-view-btn' + (view === 'simple-list' ? ' is-active' : '') + '" data-set-id="' + escapeHtml(setId) + '" data-view="simple-list">حدیث‌ها</button>';
-                    html += '</div></div>';
+                    html += '</div>';
                     html += buildConsensusMembersTable(setId);
                     html += '</div>';
                 }
