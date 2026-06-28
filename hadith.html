@@ -496,6 +496,12 @@
             margin-bottom: 8px;
             line-height: 1.7;
         }
+        .consensus-section-summary {
+            margin: -6px 0 14px;
+            font-size: 0.92rem;
+            color: #475569;
+        }
+        .consensus-summary-sep { color: #cbd5e1; }
         .consensus-card-badges {
             margin-bottom: 8px;
         }
@@ -1828,7 +1834,21 @@
                     return '<p class="loading">حدیثی برای این آیه پیدا نشد.</p>';
                 }
                 var visibleCount = Math.min(state.consensusVisibleCount, state.consensusMatchedSetIds.length);
-                var html = '<h2 class="hadith-section-title">احادیث مرتبط با این آیه (' + fmtFa(state.consensusMatchedSetIds.length) + ')</h2>';
+                var groupCount = state.consensusMatchedSetIds.length;
+                var totalHadiths = 0, singletonCount = 0;
+                for (var t = 0; t < groupCount; t++) {
+                    var sm = state.consensusTranslateById && state.consensusTranslateById[state.consensusMatchedSetIds[t]];
+                    var mc = (sm && sm.member_count != null) ? Number(sm.member_count) : 1;
+                    totalHadiths += mc;
+                    if (mc === 1) singletonCount++;
+                }
+                var clusterCount = groupCount - singletonCount;
+                var html = '<h2 class="hadith-section-title">احادیث مرتبط با این آیه</h2>';
+                html += '<div class="consensus-section-summary">' +
+                    fmtFa(totalHadiths) + ' حدیث در ' + fmtFa(groupCount) + ' گروه' +
+                    ' <span class="consensus-summary-sep">·</span> ' +
+                    fmtFa(singletonCount) + ' تک‌حدیث و ' + fmtFa(clusterCount) + ' مجموعه اجماعی' +
+                    '</div>';
                 html += '<div id="consensus-list">';
                 for (var i = 0; i < visibleCount; i++) {
                     html += renderConsensusCard(state.consensusMatchedSetIds[i], i);
