@@ -1749,7 +1749,7 @@
                 var metaParts = [];
                 if (summary && summary.member_count != null) metaParts.push(fmtFa(summary.member_count) + ' حدیث');
                 if (summary && summary.segment_count != null) metaParts.push(fmtFa(summary.segment_count) + ' بخش');
-                if (summary && summary.translation_available_count != null) metaParts.push(fmtFa(summary.translation_available_count) + ' ترجمه');
+                if (summary && Number(summary.translation_available_count) > 0) metaParts.push(fmtFa(summary.translation_available_count) + ' ترجمه');
                 if (summary && summary.translation_source_hid != null) metaParts.push('شماره حدیث: ' + escapeHtml(fmtFa(summary.translation_source_hid)));
                 if (detail && detail.translation_language) metaParts.push('زبان ترجمه: ' + escapeHtml(localizedLanguageName(detail.translation_language)));
                 if (detail && detail.translation_source) {
