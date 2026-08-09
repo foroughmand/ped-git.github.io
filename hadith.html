@@ -759,10 +759,11 @@
             // The reconstructed/consensus hadith data is served from a GitHub repo.
             // Two versions share the same schema; the version is user-selectable in settings.
             const HADITH_DB_VERSIONS = {
+                'hadith-db-v02': 'https://raw.githubusercontent.com/csquranics/hadith-db-v02/main',
                 'hadith-db-v01': 'https://raw.githubusercontent.com/csquranics/hadith-db-v01/main',
                 'quran-hadith-data': 'https://raw.githubusercontent.com/csquranics/quran-hadith-data/main'
             };
-            const HADITH_DB_DEFAULT_VERSION = 'hadith-db-v01';
+            const HADITH_DB_DEFAULT_VERSION = 'hadith-db-v02';
             const HADITH_DB_VERSION_STORAGE_KEY = 'hadith-db-version';
             const HADITH_SOURCE_STORAGE_KEY = 'hadith-source';
             const HADITH_SOURCE_HADITH_AI = 'hadith-ai';
@@ -1486,6 +1487,7 @@
                 var hadithAiChecked = source === HADITH_SOURCE_HADITH_AI ? ' checked' : '';
                 var consensusChecked = source === HADITH_SOURCE_CONSENSUS ? ' checked' : '';
                 var dbVersion = state.dbVersion;
+                var dbV02Checked = dbVersion === 'hadith-db-v02' ? ' checked' : '';
                 var dbV01Checked = dbVersion === 'hadith-db-v01' ? ' checked' : '';
                 var dbLegacyChecked = dbVersion === 'quran-hadith-data' ? ' checked' : '';
                 var exportDisabled = state.exportInProgress ? ' disabled' : '';
@@ -1508,7 +1510,8 @@
                 html += '</div>';
                 html += '<div class="hadith-settings-section">';
                 html += '<div class="hadith-links-title">نسخه پایگاه احادیث (بازسازی شده)</div>';
-                html += '<label class="hadith-source-option"><input type="radio" name="hadith-db-version" value="hadith-db-v01"' + dbV01Checked + '>نسخه جدید (v01)</label>';
+                html += '<label class="hadith-source-option"><input type="radio" name="hadith-db-version" value="hadith-db-v02"' + dbV02Checked + '>نسخه جدید (v02)</label>';
+                html += '<label class="hadith-source-option"><input type="radio" name="hadith-db-version" value="hadith-db-v01"' + dbV01Checked + '>نسخه v01</label>';
                 html += '<label class="hadith-source-option"><input type="radio" name="hadith-db-version" value="quran-hadith-data"' + dbLegacyChecked + '>نسخه قبلی</label>';
                 html += '</div>';
                 html += '<div class="hadith-settings-section">';
